@@ -8,7 +8,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-namespace String2Resource.Properties
+namespace String2Resources.Properties
 {
 
 
