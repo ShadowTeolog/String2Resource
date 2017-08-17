@@ -26,7 +26,6 @@ namespace String2Resources
         public Int32 StringCount
         {
             get
-            
             {
                 if (Quotes.Count == 0) return 0;
                 return (Int32)(Quotes.Count / 2);

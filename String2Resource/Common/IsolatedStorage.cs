@@ -29,7 +29,7 @@ namespace String2Resources
                 {
                     writer.WriteStartDocument();
                     writer.WriteComment("  Copyright © Smartcoding 2017  ");
-                    writer.WriteComment("  Regex entries encoded because of extensive use of reserved characters  ");
+                    writer.WriteComment("  Regex entries encoded because of extensive use of reserved characters");
                     writer.WriteStartElement("RegexList");
                     writer.WriteStartElement("Find");
                     foreach (string str in find) writer.WriteElementString("Regex", XmlConvert.EncodeName(str));
@@ -46,27 +46,6 @@ namespace String2Resources
 
         public Tuple<List<string>, List<string>> Load()
         {
-
-            /*
-            
-             * Dim ifs As IsolatedStorageFile = IsolatedStorageFile.GetUserStoreForAssembly()
-            If ifs.FileExists(frm.Name + ".v2.xml") Then
-                Using isoStream As IsolatedStorageFileStream = New IsolatedStorageFileStream(frm.Name + ".v2.xml", FileMode.Open, ifs)
-                    Using reader As XmlReader = XmlReader.Create(isoStream)
-                        reader.MoveToContent()
-                        While reader.Read
-                            If reader.NodeType = XmlNodeType.Element Then
-                                If reader.Name = "Dock" Then dockdata = reader.ReadString()
-                                If reader.Name = "X" Then x = Integer.Parse(reader.ReadString())
-                                If reader.Name = "Y" Then y = Integer.Parse(reader.ReadString())
-                                If reader.Name = "H" Then h = Integer.Parse(reader.ReadString())
-                                If reader.Name = "W" Then w = Integer.Parse(reader.ReadString())
-                            End If
-                        End While
-                    End Using
-                End Using
-            End If
-             */
             List<string> find = new List<string>();
             List<string> ignore = new List<string>();
             IsolatedStorageFile isf = IsolatedStorageFile.GetUserStoreForAssembly();
@@ -105,25 +84,30 @@ namespace String2Resources
                 ListDefaults(ref find, ref ignore);
             }
 
-            return new Tuple<List<string>, List<string>>(find,ignore);
-            
-            
+            return new Tuple<List<string>, List<string>>(find,ignore);            
         }
 
         private void ListDefaults(ref List<string> find, ref List<string> ignore)
         {
-            find.Add(".*[\\+]$");                    //  .*[\+]$             -- line ends with "+" (string concat?)
-            find.Add("\\\"[^\\\"]*\\\",");           //  \"[^\"]*\",         -- lines containing "xxx",
-            find.Add("Format?\\(\\\"[^\\\"].*");     //  Format\(\"[^\"].*   -- contains (String.) Format(
-            find.Add("Show?\\(\\\"[^\\\"].*");       //  Show?\(?\"[^\"].*   -- contains (Messagebox.) Show( 
-            find.Add("Text = \\\"[^\\\"]*\\\"");     //  Text =?\"[^\"]*\"   -- line contains (Control.)Text = "xxx"
-            find.Add("Text \\+= \\\"[^\\\"]*\\\"");  //  Text =?\"[^\"]*\"   -- line contains (Control.)Text += "xxx"
-            find.Add("(A|a)s String = \\\".*");      //  As String = \".*    -- line contains vb String declaration
 
-            ignore.Add("(data source=)");              //  data source=.*       -- string containing "data source="
-            ignore.Add("(Cipher)");                    //  Cipher               -- string containing "Cipher"
-            ignore.Add("(LogEntry)");                  //  LogEntry             -- string containing "LogEntry"
+            find.Add("(\\.Text)");                  //  (.Text)           -- line contains (Control).Text = "xxx"
+            find.Add("(\\.DisplayMember)");         //  (.DisplayMember)  -- line contains (Control).DisplayMember = "xxx"
+            find.Add("(\\.Format?\\()");            //  (\.Format?\()     -- line contains (string).Format(
+            
+            
+            /*
+            find.Add(".*[\\+]$");                    //  .*[\+]$            -- line ends with "+" (string concat?)
+            //find.Add("\\\"[^\\\"]*\\\",");           //  \"[^\"]*\",        -- lines containing "xxx",
+            find.Add("Format?\\(\\\"[^\\\"].*");     //  Format\(\"[^\"].*  -- contains (String.) Format(
+            find.Add("Show?\\(\\\"[^\\\"].*");       //  Show?\(?\"[^\"].*  -- contains (Messagebox.) Show( 
+            find.Add("Text = \\\"[^\\\"]*\\\"");     //  Text =?\"[^\"]*\"  -- line contains (Control.)Text = "xxx"
+            find.Add("Text \\+= \\\"[^\\\"]*\\\"");  //  Text =?\"[^\"]*\"  -- line contains (Control.)Text += "xxx"
+            find.Add("(A|a)s String = \\\".*");      //  As String = \".*   -- line contains vb String declaration
 
+            ignore.Add("(data source=)");            //  data source=       -- string containing "data source="
+            ignore.Add("(Cipher)");                  //  Cipher             -- string containing "Cipher"
+            ignore.Add("(LogEntry)");                //  LogEntry           -- string containing "LogEntry"
+            */
         }
 
 

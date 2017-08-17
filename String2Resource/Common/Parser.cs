@@ -12,28 +12,36 @@ namespace String2Resources
 {
     public static class Parser
     {
-
-
-        public static List<FileInfo> GetAllFiles(List<FileInfo> fileInfos, string path, string pattern)
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="path"></param>
+        /// <param name="patterns"></param>
+        /// <returns></returns>
+        public static List<FileInfo> GetAllFiles(string path, string[] patterns)
         {
 
             var files = new List<string>();
+            var fileInfos = new List<FileInfo>();
 
-            try
-            {
-                files.AddRange(Directory.GetFiles(path, pattern, SearchOption.TopDirectoryOnly));
+            foreach (string pattern in patterns)
+                files.AddRange(Directory.GetFiles(path, pattern, SearchOption.AllDirectories  /* SearchOption.TopDirectoryOnly */));
 
-                foreach (string file in files)
-                    fileInfos.Add(new FileInfo(file));
-
-                foreach (var directory in Directory.GetDirectories(path))
-                    GetAllFiles(fileInfos, directory, pattern);
-            }
-            catch (UnauthorizedAccessException) { /* can't go here, just ignore */ }
+            foreach (string file in files.Distinct())
+                fileInfos.Add(new FileInfo(file));
 
             return fileInfos;
         }
 
+        /// <summary>
+        /// Parse file to extract strings
+        /// </summary>
+        /// <param name="fi">File to parse</param>
+        /// <param name="findTemplates">Regexes finding strings</param>
+        /// <param name="excludeTemplates">Regexes to exclude from search</param>
+        /// <param name="findOptions">Case sensitive finding?</param>
+        /// <param name="ignoreOptions">Case sensitive ignoring?</param>
+        /// <returns></returns>
         public static List<ParseResult> GetStrings(FileInfo fi, List<string> findTemplates, List<string> excludeTemplates, RegexOptions findOptions, RegexOptions ignoreOptions)
         {
             var results = new List<ParseResult>();
@@ -54,104 +62,105 @@ namespace String2Resources
                             continue;
                         }
 
-
                         if (inLine.Contains('"'))
                         {
                             bool replace = true;
                             var line = new ParseResult() { LineContent = inLine, LineNumber = lineNumber, Quotes = new List<Int32>() };
 
+                            // get qoute locations
                             foreach (Match match in Regex.Matches(inLine, "\"")) line.Quotes.Add(match.Index);
 
                             if (findTemplates.Count > 0)
                             {
-                                foreach (string find in findTemplates)
+                                // check if we ignore this line
+                                foreach (var ignore in excludeTemplates)
                                 {
-                                    foreach (Match match in Regex.Matches(inLine, find, findOptions))
+                                    var contains = Regex.Matches(inLine, ignore, ignoreOptions);
+                                    if (contains.Count > 0)
                                     {
-
-                                        foreach (string ignore in excludeTemplates)
-                                        {
-                                            /*
-                                            if (inLine.Contains(ignore))
-                                            {
-                                                replace = false;
-                                                break;
-                                            }
-                                            */
-                                            //var contains = Regex.Matches(match.Value, ignore);
-                                            var contains = Regex.Matches(inLine, ignore, ignoreOptions);
-                                            if (contains.Count > 0)
-                                            {
-                                                replace = false;
-                                                break;
-                                            }
-                                        }
-
-                                        if (replace)
-                                            ParseLine(ref line);
-
+                                        replace = false;
+                                        break;
                                     }
-
-
-
-
                                 }
+
+                                // does the line contain what we looking for?
+                                if (replace)
+                                {
+                                    replace = false;
+                                    foreach (string find in findTemplates)
+                                    {
+                                        if (Regex.Matches(inLine, find, findOptions).Count > 0)
+                                        {
+                                            replace = true;
+                                            break;
+                                        }
+                                    }
+                                }
+
+                                // if so, get all string from that line
+                                if (replace) ParseLine(ref line);
                             }
                             else
                             {
                                 ParseLine(ref line);
                             }
-
                             results.Add(line);
                         }
-
                         ++lineNumber;
                     }
-
-
-
-
                 }
             }
             catch (Exception e)
             {
-
                 MessageBox.Show(e.Message, "Parse error");
             }
 
             return results;
-
-
         }
 
 
+        /// <summary>
+        /// Get hard coded strings from source code line
+        /// </summary>
+        /// <param name="result"></param>
         public static void ParseLine(ref ParseResult result)
         {
-
-            foreach (Match str in Regex.Matches(result.LineContent, "\"[^\"]*\""))
+            foreach (Match str in Regex.Matches(result.LineContent, "\"[^\"]*[\"]"))
             {
-                if (!result.ReplaceFinds.Contains(str.Value))
+                if (!string.IsNullOrWhiteSpace(str.Value) && str.Value != "\"\"")
                 {
-                    ++result.ReplaceCount;
-                    result.ReplaceFinds.Add(str.Value);
-                    result.ToResource = true;
+                    if (!result.ReplaceFinds.Contains(str.Value))
+                    {
+                        ++result.ReplaceCount;
+                        result.ReplaceFinds.Add(str.Value);
+                        result.ToResource = true;
+                    }
                 }
-            }
 
+            }
         }
 
 
-
-
-
-        internal static bool CreateMultipleResource(List<FileInfo> files, FileInfo selectedResource, Dictionary<FileInfo, List<ParseResult>> parsedFiles /* List<ParseResult> replacements */ ,
+        /// <summary>
+        /// Add selected hard coded strings to seleced resource file
+        /// </summary>
+        /// <param name="files">Files selected to be parsed</param>
+        /// <param name="selectedResource">Resource file to be used</param>
+        /// <param name="parsedFiles">Preparsed (possibly manually changed) sources</param>
+        /// <param name="findTemplates">Regexes for finding replacements</param>
+        /// <param name="findOptions">Case sensitive find?</param>
+        /// <param name="excludeTemplates">Regexes for ignoring lines</param>
+        /// <param name="ignoreOptions">Case sensitive ignore?</param>
+        /// <param name="progressBarFile">Progress bar for files progress</param>
+        /// <param name="progressBarAll">Progress bar for filecontent progress</param>
+        /// <returns></returns>
+        internal static bool AddToResourceFile(List<FileInfo> files, FileInfo selectedResource, Dictionary<FileInfo, List<ParseResult>> parsedFiles /* List<ParseResult> replacements */ ,
                                                      ref List<string> findTemplates, RegexOptions findOptions, ref List<string> excludeTemplates, RegexOptions ignoreOptions, ref ProgressBar progressBarFile, ref ProgressBar progressBarAll)
         {
             Hashtable resxEntries = GetResourceEntries(ref selectedResource);
 
             string resourcePrefix = string.Empty;
             bool succes = true;
-            //bool dynamicReplace = (replacements.Count == 0);
             Int32 lineNumber = 0;
             Int32 lineCount = 0;
             Int32 resourceId = 0;
@@ -171,7 +180,7 @@ namespace String2Resources
                 // use the form name as a resource prefix
                 resourcePrefix = fi.Name.Replace(fi.Extension, string.Empty).Replace(".", "_") + "_";
 
-                lineCount = BackupSourceFile(lineCount, fi);
+                lineCount = BackupSourceFile(fi);
                 ++progressBarAll.Value;
                 progressBarAll.Update();
                 progressBarFile.Maximum = lineCount + 1;
@@ -179,7 +188,7 @@ namespace String2Resources
 
                 var preParsed = parsedFiles.FirstOrDefault(c => c.Key == fi);
                 if (preParsed.Value == null)
-                    replacements = GetStrings(fi, findTemplates, excludeTemplates,findOptions,ignoreOptions);
+                    replacements = GetStrings(fi, findTemplates, excludeTemplates, findOptions, ignoreOptions);
                 else
                     replacements = preParsed.Value;
 
@@ -196,7 +205,7 @@ namespace String2Resources
                                 ParseResult moveToResource = replacements.FirstOrDefault(c => c.LineNumber == lineNumber);
 
                                 if (moveToResource != null && moveToResource.ReplaceFinds.Count > 0)
-                                    resxEntries = ReplaceStringsInCode(resxEntries, ref inLine, ref resourceId, ref resourcePrefix, ref moveToResource);
+                                    resxEntries = ReplaceStringsInCode(resxEntries, fi.Extension, ref inLine, ref resourceId, ref resourcePrefix, ref moveToResource);
 
                                 sourceCodeFile.WriteLine(inLine);
 
@@ -208,17 +217,13 @@ namespace String2Resources
                             sourceCodeFile.Flush();
                             sourceCodeFile.Close();
                         }
-
                         // done, close source code file
                         backupFile.Close();
                     }
-
-
-
                 }
-
             }
 
+            // (re-)write the resource file...
             using (ResXResourceWriter resxFile = new ResXResourceWriter(selectedResource.FullName))
             {
                 foreach (String key in resxEntries.Keys)
@@ -231,8 +236,18 @@ namespace String2Resources
             return succes;
         }
 
-
-        private static Hashtable ReplaceStringsInCode(Hashtable resxEntries, ref string inLine, ref Int32 resourceId, ref string resourcePrefix, ref ParseResult moveToResource)
+        /// <summary>
+        /// Replace hard coded string with resource reference.
+        /// If the resource file allready contains a similar string the existing resource string is referenced.
+        /// </summary>
+        /// <param name="resxEntries">Resource file contents</param>
+        /// <param name="ext">File extention (vb or cs replacement?)</param>
+        /// <param name="inLine">Line to parse</param>
+        /// <param name="resourceId">serial number for resource key</param>
+        /// <param name="resxKeyName">resource key name</param>
+        /// <param name="moveToResource">Replacement strings</param>
+        /// <returns></returns>
+        private static Hashtable ReplaceStringsInCode(Hashtable resxEntries, string ext, ref string inLine, ref Int32 resourceId, ref string resxKeyName, ref ParseResult moveToResource)
         {
             string cleanReplace = string.Empty;
             string resourceKey = string.Empty;
@@ -241,29 +256,36 @@ namespace String2Resources
             foreach (string replacment in moveToResource.ReplaceFinds)
             {
                 resourceKey = string.Empty;
-                cleanReplace = replacment.Replace("\"", "");
+                cleanReplace = replacment.Trim('"'); //.Replace("\"", "");    // Resource value is string without quotes!
 
                 keyExists = resxEntries.ContainsValue(cleanReplace);
 
                 if (keyExists)
                 {
-                    resourceKey = resxEntries.Keys.OfType<String>().FirstOrDefault(s => resxEntries[s] == cleanReplace);
+                    resourceKey = resxEntries.Keys.OfType<String>().Where(obj => resxEntries[obj] is string).FirstOrDefault(s => (string)resxEntries[s] == cleanReplace);
                 }
                 else
                 {
-                    resourceKey = string.Format("{0}{1:#0000}", resourcePrefix, ++resourceId);
+                    resourceKey = string.Format("{0}{1:#0000}", resxKeyName, ++resourceId);
                     resxEntries.Add(resourceKey, cleanReplace);
                 }
 
-                inLine = inLine.Replace(replacment, "My.Resources." + resourceKey);
+                var replacementString = (ext.ToLower() == "vb") ? "My.Resources.{0}" : "Properties.Resources.ResourceManager.GetString(\"{0}\")"; ;
+                inLine = inLine.Replace(replacment, string.Format(replacementString,resourceKey));
 
             }
 
             return resxEntries;
         }
 
-        private static int BackupSourceFile(Int32 lineCount, FileInfo fi)
+        /// <summary>
+        /// Backup sourcefile
+        /// </summary>        
+        /// <param name="fi"></param>
+        /// <returns></returns>
+        private static int BackupSourceFile(FileInfo fi)
         {
+            Int32 lineCount = 0;
             // for using the progress bar..
             using (StreamReader sourceFile = new StreamReader(fi.FullName))
             {
@@ -276,13 +298,18 @@ namespace String2Resources
         }
 
 
+        /// <summary>
+        /// Get existing resources to move to newly created resource file
+        /// </summary>
+        /// <param name="selectedResource">(existing?) resource file to migrate strings to</param>
+        /// <returns></returns>
         static Hashtable GetResourceEntries(ref FileInfo selectedResource)
         {
             Hashtable entries = new Hashtable();
 
             if (File.Exists(selectedResource.FullName))
             {
-                // obtain the existing resources, after creating a backup
+                // obtain the existing resources, _after_ creating a backup
                 if (File.Exists(selectedResource.FullName + ".bak")) File.Delete(selectedResource.FullName + ".bak");
                 File.Copy(selectedResource.FullName, selectedResource.FullName + ".bak");
 

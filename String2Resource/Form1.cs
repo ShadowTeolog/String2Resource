@@ -43,7 +43,7 @@ namespace String2Resources
 
 
             treeView1.NodeMouseClick += (s, e) =>
-                {                    
+                {
                     if (e.Node.Tag is FileInfo)
                     {
                         dataGridView1.DataSource = null;
@@ -79,10 +79,10 @@ namespace String2Resources
 
             dataGridView2.DefaultCellStyle.Font = new Font("Courier New", 12);
             foreach (string str in find) dataGridView2.Rows.Add(str);
-            
+
             dataGridView3.DefaultCellStyle.Font = new Font("Courier New", 12);
             foreach (string str in ignore) dataGridView3.Rows.Add(str);
-            
+
 
             _path = string.Empty;
             treeView1.Nodes.Clear();
@@ -117,7 +117,7 @@ namespace String2Resources
             {
                 treeView1.SelectedNode = selectedNode;
                 TreeNodeMouseClickEventArgs arg = new TreeNodeMouseClickEventArgs(selectedNode, MouseButtons.Left, 1, 0, 0);
-                button2_Click(treeView1, arg);
+                button2_Click(listBox1, arg);
             }
 
         }
@@ -169,6 +169,7 @@ namespace String2Resources
         {
             _path = string.Empty;
             treeView1.Nodes.Clear();
+            dataGridView1.DataSource = null;
             _selectedSourceCode = null;
             label7.Text = string.Empty;
             label3.Text = string.Empty;
@@ -186,7 +187,7 @@ namespace String2Resources
                 if (result == System.Windows.Forms.DialogResult.OK)
                 {
                     _path = dlg.SelectedPath;
-                    LoadTreeView1(_path, ".vb");
+                    LoadTreeView1(_path);
                 }
             }
 
@@ -210,15 +211,16 @@ namespace String2Resources
         }
 
 
-        private void LoadTreeView1(string basePath, string ext)
+        private void LoadTreeView1(string basePath)
         {
 
-            var pattern = @"*" + ext;
+            string[] pattern = (checkBox3.Checked) ? new[] { "*.designer.vb", "*.designer.cs" } : new[] { "*.vb", "*.cs" };
+
             var rootFolder = new DirectoryInfo(basePath).Name;
             var nodeKey = string.Empty;
             TreeNode lastNode = null;
 
-            var files = Parser.GetAllFiles(new List<FileInfo>(), basePath, pattern);
+            var files = Parser.GetAllFiles(basePath, pattern);
 
             treeView1.Nodes.Clear();
             treeView1.CheckBoxes = true;
@@ -226,7 +228,7 @@ namespace String2Resources
 
             if (files.Count == 0)
             {
-                MessageBox.Show(string.Format("No files with extension \"{0}\" found.", ext));
+                MessageBox.Show("No files with extension .cs or .vb found.");
                 return;
             }
 
@@ -234,6 +236,7 @@ namespace String2Resources
             {
                 nodeKey = string.Empty;
                 var root = fi.FullName.Replace(basePath, string.Empty);
+                var ext = fi.Extension;
 
                 foreach (string subPath in root.Split('\\'))
                 {
@@ -290,40 +293,40 @@ namespace String2Resources
 
 
 
-            _selectedSourceCode = (FileInfo)node.Tag;
-            List<ParseResult> parsed = null;
+            if ((sender is TreeView)) _selectedSourceCode = (FileInfo)node.Tag;
+            if (_selectedSourceCode == null) return;
 
-            var preParsed = _parseResult.FirstOrDefault(c => c.Key == _selectedSourceCode);
+            List<string> findTemplates = FindTemplates();
+            List<string> excludeTemplates = ExcludeTemplates();
+            RegexOptions findOptions = (checkBox1.Checked) ? RegexOptions.None : RegexOptions.IgnoreCase;
+            RegexOptions ignoreOptions = (checkBox2.Checked) ? RegexOptions.None : RegexOptions.IgnoreCase;
+            Dictionary<FileInfo, List<ParseResult>> reparseResults = new Dictionary<FileInfo, List<ParseResult>>();
 
-
-            if (preParsed.Value != null && (e is TreeNodeMouseClickEventArgs)) parsed = preParsed.Value;
-
-            if (parsed == null)
+            foreach (KeyValuePair<FileInfo, List<ParseResult>> parsed in _parseResult)
             {
-                List<string> findTemplates = FindTemplates();
-                List<string> excludeTemplates = ExcludeTemplates();
-                RegexOptions findOptions = (checkBox1.Checked) ? RegexOptions.None : RegexOptions.IgnoreCase;
-                RegexOptions ignoreOptions = (checkBox2.Checked) ? RegexOptions.None : RegexOptions.IgnoreCase;
-                parsed = Parser.GetStrings(_selectedSourceCode, findTemplates, excludeTemplates,findOptions,ignoreOptions);
-                if (preParsed.Value != null /* && (e is TreeNodeMouseClickEventArgs) */) _parseResult.Remove(_selectedSourceCode);
-                _parseResult.Add(_selectedSourceCode, parsed);
+                var reparsedResult = Parser.GetStrings(parsed.Key, findTemplates, excludeTemplates, findOptions, ignoreOptions);
+                reparseResults.Add(parsed.Key, reparsedResult);
             }
 
-            dataGridView1.DataSource = parsed;
+            if (!reparseResults.ContainsKey(_selectedSourceCode))
+            {
+                var reparsedResult = Parser.GetStrings(_selectedSourceCode, findTemplates, excludeTemplates, findOptions, ignoreOptions);
+                reparseResults.Add(_selectedSourceCode, reparsedResult);
+            }
+
+            _parseResult = reparseResults;
+            var selectedFileContent  = _parseResult.FirstOrDefault(c => c.Key == _selectedSourceCode).Value ;
+
+            dataGridView1.DataSource = selectedFileContent;
             label3.Text = string.Format("Selected: {0}", _selectedSourceCode.FullName);
             tabControl1.SelectedTab = tabPage2;
 
-
-            if (isTreeviewSelect) listBox1.SelectedIndexChanged -= listBox1_SelectedIndexChanged;
-
+            listBox1.SelectedIndexChanged -= listBox1_SelectedIndexChanged;
             var editted = _parseResult.Keys.ToList<FileInfo>().OrderBy(c => c.Name);
             listBox1.DataSource = new BindingSource(editted, null);
             var selected = editted.FirstOrDefault(c => c == _selectedSourceCode);
             listBox1.SelectedItem = selected;
-
-            if (isTreeviewSelect) listBox1.SelectedIndexChanged += listBox1_SelectedIndexChanged;
-
-
+            listBox1.SelectedIndexChanged += listBox1_SelectedIndexChanged;
 
         }
 
@@ -354,7 +357,7 @@ namespace String2Resources
             List<string> excludeTemplates = ExcludeTemplates();
             RegexOptions findOptions = (checkBox1.Checked) ? RegexOptions.None : RegexOptions.IgnoreCase;
             RegexOptions ignoreOptions = (checkBox2.Checked) ? RegexOptions.None : RegexOptions.IgnoreCase;
-            if (Parser.CreateMultipleResource(new List<FileInfo>() { _selectedSourceCode }, _selectedResource, _parseResult, ref findTemplates, findOptions, ref excludeTemplates, ignoreOptions, ref progressBar1, ref progressBar2))
+            if (Parser.AddToResourceFile(new List<FileInfo>() { _selectedSourceCode }, _selectedResource, _parseResult, ref findTemplates, findOptions, ref excludeTemplates, ignoreOptions, ref progressBar1, ref progressBar2))
                 Process.Start(_selectedSourceCode.FullName.Replace(_selectedSourceCode.Name, string.Empty));
 
             this.Cursor = Cursors.Default;
@@ -382,7 +385,7 @@ namespace String2Resources
             List<string> excludeTemplates = ExcludeTemplates();
             RegexOptions findOptions = (checkBox1.Checked) ? RegexOptions.None : RegexOptions.IgnoreCase;
             RegexOptions ignoreOptions = (checkBox2.Checked) ? RegexOptions.None : RegexOptions.IgnoreCase;
-            if (Parser.CreateMultipleResource(files, _selectedResource, _parseResult /* new List<ParseResult>() */, ref findTemplates, findOptions, ref excludeTemplates, ignoreOptions, ref progressBar1, ref progressBar2))
+            if (Parser.AddToResourceFile(files, _selectedResource, _parseResult /* new List<ParseResult>() */, ref findTemplates, findOptions, ref excludeTemplates, ignoreOptions, ref progressBar1, ref progressBar2))
                 Process.Start(_path);
 
         }
