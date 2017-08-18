@@ -8,3 +8,5 @@ The initial version was specifically written to move hard code strings in all VB
 The regex string select/ignore works wel, provided you use the right expressions and the source code is not too bad.
 
 Always run this tool on a copy of your source!
+
+A compiled version with setup (https://github.com/lextendo/String2Resource/releases) is available.
