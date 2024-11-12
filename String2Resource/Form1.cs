@@ -1,12 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Data;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
 
@@ -128,20 +126,31 @@ namespace String2Resources
         {
             if (e.ColumnIndex == 0)
             {
-                if (dataGridView1.Rows[e.RowIndex] != null)
+                if (e.RowIndex != -1)
                 {
-                    var data = dataGridView1.Rows[e.RowIndex].DataBoundItem as ParseResult;
+                    Process(e.RowIndex);
+                }
+                else
+                {
+                    for (int i = 0; i < dataGridView1.Rows.Count; i++)
+                        Process(i);
+                }
+            }
 
-
-                    if (data != null)
+            void Process(int rowIndex)
+            {
+                if (dataGridView1.Rows[rowIndex] != null)
+                {
+                    if (dataGridView1.Rows[rowIndex].DataBoundItem is ParseResult data)
                     {
                         data.ToResource = !data.ToResource;
                         data.ReplaceCount = 0;
-                        data.ReplaceFinds = new List<string>();
-                        if (data.ToResource) Parser.ParseLine(ref data);
+                        data.ReplaceFinds = [];
+                        if (data.ToResource)
+                            Parser.ParseLine(ref data);
                     }
                     dataGridView1.EndEdit();
-                    dataGridView1.InvalidateRow(e.RowIndex);
+                    dataGridView1.InvalidateRow(rowIndex);
                 }
             }
         }
@@ -315,7 +324,7 @@ namespace String2Resources
             }
 
             _parseResult = reparseResults;
-            var selectedFileContent  = _parseResult.FirstOrDefault(c => c.Key == _selectedSourceCode).Value ;
+            var selectedFileContent = _parseResult.FirstOrDefault(c => c.Key == _selectedSourceCode).Value;
 
             dataGridView1.DataSource = selectedFileContent;
             label3.Text = string.Format("Selected: {0}", _selectedSourceCode.FullName);
@@ -386,7 +395,15 @@ namespace String2Resources
             RegexOptions findOptions = (checkBox1.Checked) ? RegexOptions.None : RegexOptions.IgnoreCase;
             RegexOptions ignoreOptions = (checkBox2.Checked) ? RegexOptions.None : RegexOptions.IgnoreCase;
             if (Parser.AddToResourceFile(files, _selectedResource, _parseResult /* new List<ParseResult>() */, ref findTemplates, findOptions, ref excludeTemplates, ignoreOptions, ref progressBar1, ref progressBar2))
-                Process.Start(_path);
+            {
+                try
+                {
+                    //Process.Start(_path);
+                }
+                catch (Exception ex)
+                {
+                }
+            }
 
         }
 
