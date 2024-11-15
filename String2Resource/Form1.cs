@@ -12,11 +12,9 @@ namespace String2Resources
 {
     public partial class Form1 : Form
     {
-
-        FileInfo _selectedSourceCode;
+        FileInfo? _selectedSourceCode;
         FileInfo _selectedResource;
-        //List<ParseResult> _parseResult;
-        Dictionary<FileInfo, List<ParseResult>> _parseResult = new Dictionary<FileInfo, List<ParseResult>>();
+        Dictionary<FileInfo, List<ParseResult>> _parseResult = [];
 
         String _path;
 
@@ -65,8 +63,8 @@ namespace String2Resources
             dataGridView1.CellContentClick += dataGridView1_CellContentClick;
 
 
-            List<string> find = new List<string>();
-            List<string> ignore = new List<string>();
+            List<string> find = [];
+            List<string> ignore = [];
 
             using (IsolatedStorage isolatedStorage = new IsolatedStorage())
             {
@@ -100,10 +98,10 @@ namespace String2Resources
 
         }
 
-        void listBox1_SelectedIndexChanged(object sender, EventArgs e)
+        void listBox1_SelectedIndexChanged(object? sender, EventArgs e)
         {
-            _selectedSourceCode = (FileInfo)listBox1.SelectedValue;
-            TreeNode selectedNode = null;
+            _selectedSourceCode = (FileInfo?)listBox1.SelectedValue;
+            TreeNode? selectedNode = null;
 
             foreach (TreeNode findNode in treeView1.Nodes)
             {
@@ -122,7 +120,7 @@ namespace String2Resources
 
 
 
-        void dataGridView1_CellContentClick(object sender, DataGridViewCellEventArgs e)
+        void dataGridView1_CellContentClick(object? sender, DataGridViewCellEventArgs e)
         {
             if (e.ColumnIndex == 0)
             {
@@ -156,7 +154,7 @@ namespace String2Resources
         }
 
 
-        private void dataGridView1_CellMouseDown(object sender, DataGridViewCellMouseEventArgs e)
+        private void dataGridView1_CellMouseDown(object? sender, DataGridViewCellMouseEventArgs e)
         {
             if (e.Button == MouseButtons.Right)
             {
@@ -174,7 +172,7 @@ namespace String2Resources
         }
 
 
-        private void button1_Click(object sender, EventArgs e)
+        private void button1_Click(object? sender, EventArgs e)
         {
             _path = string.Empty;
             treeView1.Nodes.Clear();
@@ -223,11 +221,12 @@ namespace String2Resources
         private void LoadTreeView1(string basePath)
         {
 
-            string[] pattern = (checkBox3.Checked) ? new[] { "*.designer.vb", "*.designer.cs" } : new[] { "*.vb", "*.cs" };
+            string[] pattern = (checkBox3.Checked)
+                ? ["*.designer.vb", "*.designer.cs"]
+                : ["*.vb", "*.cs"];
 
             var rootFolder = new DirectoryInfo(basePath).Name;
-            var nodeKey = string.Empty;
-            TreeNode lastNode = null;
+            TreeNode? lastNode = null;
 
             var files = Parser.GetAllFiles(basePath, pattern);
 
@@ -243,7 +242,7 @@ namespace String2Resources
 
             foreach (FileInfo fi in files)
             {
-                nodeKey = string.Empty;
+                var nodeKey = string.Empty;
                 var root = fi.FullName.Replace(basePath, string.Empty);
                 var ext = fi.Extension;
 
@@ -309,7 +308,7 @@ namespace String2Resources
             List<string> excludeTemplates = ExcludeTemplates();
             RegexOptions findOptions = (checkBox1.Checked) ? RegexOptions.None : RegexOptions.IgnoreCase;
             RegexOptions ignoreOptions = (checkBox2.Checked) ? RegexOptions.None : RegexOptions.IgnoreCase;
-            Dictionary<FileInfo, List<ParseResult>> reparseResults = new Dictionary<FileInfo, List<ParseResult>>();
+            Dictionary<FileInfo, List<ParseResult>> reparseResults = [];
 
             foreach (KeyValuePair<FileInfo, List<ParseResult>> parsed in _parseResult)
             {
@@ -339,7 +338,7 @@ namespace String2Resources
 
         }
 
-        private void button4_Click(object sender, EventArgs e)
+        private void button4_Click(object? sender, EventArgs e)
         {
 
             if (_selectedSourceCode == null)
@@ -366,17 +365,19 @@ namespace String2Resources
             List<string> excludeTemplates = ExcludeTemplates();
             RegexOptions findOptions = (checkBox1.Checked) ? RegexOptions.None : RegexOptions.IgnoreCase;
             RegexOptions ignoreOptions = (checkBox2.Checked) ? RegexOptions.None : RegexOptions.IgnoreCase;
-            if (Parser.AddToResourceFile(new List<FileInfo>() { _selectedSourceCode }, _selectedResource, _parseResult, ref findTemplates, findOptions, ref excludeTemplates, ignoreOptions, ref progressBar1, ref progressBar2))
+            if (Parser.AddToResourceFile([_selectedSourceCode], _selectedResource,
+                _parseResult, findTemplates, findOptions, excludeTemplates, ignoreOptions, progressBar1, progressBar2))
                 Process.Start(_selectedSourceCode.FullName.Replace(_selectedSourceCode.Name, string.Empty));
 
             this.Cursor = Cursors.Default;
 
         }
 
-        private void button5_Click(object sender, EventArgs e)
+        private void button5_Click(object? sender, EventArgs e)
         {
-            List<FileInfo> files = new List<FileInfo>();
-            foreach (TreeNode node in treeView1.Nodes) GetSelectedFiles(node, ref files);
+            List<FileInfo> files = [];
+            foreach (TreeNode node in treeView1.Nodes)
+                GetSelectedFiles(node, files);
 
             if (files.Count < 1)
             {
@@ -394,7 +395,8 @@ namespace String2Resources
             List<string> excludeTemplates = ExcludeTemplates();
             RegexOptions findOptions = (checkBox1.Checked) ? RegexOptions.None : RegexOptions.IgnoreCase;
             RegexOptions ignoreOptions = (checkBox2.Checked) ? RegexOptions.None : RegexOptions.IgnoreCase;
-            if (Parser.AddToResourceFile(files, _selectedResource, _parseResult /* new List<ParseResult>() */, ref findTemplates, findOptions, ref excludeTemplates, ignoreOptions, ref progressBar1, ref progressBar2))
+            if (Parser.AddToResourceFile(files, _selectedResource, _parseResult /* new List<ParseResult>() */, findTemplates, findOptions,
+                 excludeTemplates, ignoreOptions, progressBar1, progressBar2))
             {
                 try
                 {
@@ -407,13 +409,15 @@ namespace String2Resources
 
         }
 
-        private void GetSelectedFiles(TreeNode node, ref List<FileInfo> files)
+        private static void GetSelectedFiles(TreeNode node, List<FileInfo> files)
         {
-            foreach (TreeNode tn in node.Nodes) GetSelectedFiles(tn, ref files);
-            if (node.Checked && node.Tag != null) files.Add((FileInfo)node.Tag);
+            foreach (TreeNode tn in node.Nodes)
+                GetSelectedFiles(tn, files);
+            if (node.Checked && node.Tag != null)
+                files.Add((FileInfo)node.Tag);
         }
 
-        private void FindTreeNodeByTag(object findTag, TreeNode node, ref TreeNode selectNode)
+        private static void FindTreeNodeByTag(object findTag, TreeNode node, ref TreeNode? selectNode)
         {
             if (node.Tag == findTag) selectNode = node;
 
@@ -432,22 +436,24 @@ namespace String2Resources
 
         private List<string> FindTemplates()
         {
-            List<string> regexList = new List<string>();
+            List<string> regexList = [];
             foreach (DataGridViewRow dgvr in dataGridView2.Rows)
             {
-                if (dgvr.Cells[0].Value != null && !string.IsNullOrWhiteSpace(dgvr.Cells[0].Value.ToString()))
-                    regexList.Add(dgvr.Cells[0].Value.ToString());
+                string? value = dgvr.Cells[0].Value?.ToString();
+                if (!string.IsNullOrWhiteSpace(value))
+                    regexList.Add(value);
             }
             return regexList;
         }
 
         private List<string> ExcludeTemplates()
         {
-            List<string> regexList = new List<string>();
+            List<string> regexList = [];
             foreach (DataGridViewRow dgvr in dataGridView3.Rows)
             {
-                if (dgvr.Cells[0].Value != null && !string.IsNullOrWhiteSpace(dgvr.Cells[0].Value.ToString()))
-                    regexList.Add(dgvr.Cells[0].Value.ToString());
+                string? value = dgvr.Cells[0].Value?.ToString();
+                if (!string.IsNullOrWhiteSpace(value))
+                    regexList.Add(value);
             }
             return regexList;
         }
