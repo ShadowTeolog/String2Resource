@@ -185,11 +185,10 @@ namespace String2Resources
                     // use the form name as a resource prefix
                     var resourcePrefix = fi.Name.Replace(fi.Extension, string.Empty).Replace(".", "_") + "_";
 
-                    lineCount = BackupSourceFile(fi);
+
                     ++progressBarAll.Value;
                     progressBarAll.Update();
-                    progressBarFile.Maximum = lineCount + 1;
-                    progressBarFile.Value = 0;
+
 
                     var preParsed = parsedFiles.FirstOrDefault(c => c.Key == fi);
                     List<ParseResult> replacements;
@@ -202,17 +201,25 @@ namespace String2Resources
                     {
                         //existing source file (backup)
                         var originalpath = fi.FullName;
+                        lineCount = CountFileLines(originalpath);
+                        progressBarFile.Maximum = lineCount + 1;
+                        progressBarFile.Value = 0;
+
                         var temporarysourcepath = Path.GetTempFileName();
                         using var backupFile = new StreamReader(originalpath);
                         //new sourcefile
                         using var sourceCodeFile = new StreamWriter(temporarysourcepath, false);
                         string? inLine;
+                        var somethingreplaced = false;
                         while ((inLine = backupFile.ReadLine()) != null)
                         {
                             ParseResult? moveToResource = replacements.FirstOrDefault(c => c.LineNumber == lineNumber);
 
                             if (moveToResource != null && moveToResource.ReplaceFinds.Count > 0)
+                            {
                                 ReplaceStringsInCode(originalResource, newResourceStrings, fi.Extension, ref inLine, resourcePrefix, ref moveToResource, resourceFileName);
+                                somethingreplaced = true;
+                            }
 
                             sourceCodeFile.WriteLine(inLine);
 
@@ -220,7 +227,8 @@ namespace String2Resources
                             progressBarFile.Update();
                             ++lineNumber;
                         }
-                        filesToSwap.Add((originalpath, temporarysourcepath));
+                        if (somethingreplaced)
+                            filesToSwap.Add((originalpath, temporarysourcepath));
                     }
                 }
                 using var updatedResource = new ResXResourceWriter(temporaryFilePath);
@@ -276,8 +284,18 @@ namespace String2Resources
                 var resourcevalue = resource.Value;
                 if (resourcevalue is ResXDataNode content)
                 {
-                    if ((string?)content?.GetValue((ITypeResolutionService?)null) == value)
-                        return (string)resource.Key;
+                    try
+                    {
+                        if ((string?)content?.GetValue((ITypeResolutionService?)null) == value)
+                            return (string)resource.Key;
+                    }
+                    catch (Exception e)
+                    {
+
+                    }
+                    finally
+                    {
+                    }
                 }
             }
             return null;
@@ -350,17 +368,16 @@ namespace String2Resources
         /// </summary>        
         /// <param name="fi"></param>
         /// <returns></returns>
-        private static int BackupSourceFile(FileInfo fi)
+        private static int CountFileLines(string path)
         {
-            Int32 lineCount = 0;
+            int lineCount = 0;
             // for using the progress bar..
-            using (var sourceFile = new StreamReader(fi.FullName))
+            using (var sourceFile = new StreamReader(path))
             {
                 string? inLine;
-                while ((inLine = sourceFile.ReadLine()) != null) ++lineCount;
+                while ((inLine = sourceFile.ReadLine()) != null)
+                    ++lineCount;
             }
-            if (File.Exists(fi.FullName + ".bak")) File.Delete(fi.FullName + ".bak");
-            File.Copy(fi.FullName, fi.FullName + ".bak");
             return lineCount;
         }
 
